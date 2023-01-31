@@ -1,6 +1,6 @@
 use error_stack::{report, IntoReport, ResultExt};
 
-use super::{MockDb, Store};
+use super::{cache, MockDb, Store};
 use crate::{
     connection::pg_connection,
     core::errors::{self, CustomResult},
@@ -76,12 +76,10 @@ impl ConfigInterface for Store {
         Ok(match redis_val {
             Err(err) => match err.current_context() {
                 errors::RedisError::NotFound => {
-                    let config = self.find_config_by_key(key).await?;
-                    redis
-                        .serialize_and_set_key(&config.key, &config)
-                        .await
-                        .change_context(errors::StorageError::KVError)?;
-                    config
+                    cache::inhabit_cache(&self, key, || async {
+                        self.find_config_by_key(key).await
+                    })
+                    .await?
                 }
                 err => Err(report!(errors::StorageError::KVError)
                     .attach_printable(format!("Error while fetching config {err}")))?,

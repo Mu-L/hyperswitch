@@ -5,7 +5,7 @@ use error_stack::{report, ResultExt};
 use super::Store;
 use crate::core::errors::{self, CustomResult};
 
-async fn inhabit_cache<T, F, Fut>(
+pub async fn inhabit_cache<T, F, Fut>(
     store: &Store,
     key: &str,
     fun: F,
@@ -36,7 +36,7 @@ where
     })
 }
 
-async fn redact_cache<T, F, Fut>(
+pub async fn redact_cache<T, F, Fut>(
     store: &Store,
     key: &str,
     fun: F,
