@@ -1,4 +1,4 @@
-use error_stack::{report, IntoReport, ResultExt};
+use error_stack::{report, IntoReport};
 
 use super::{cache, MockDb, Store};
 use crate::{
@@ -76,10 +76,8 @@ impl ConfigInterface for Store {
         Ok(match redis_val {
             Err(err) => match err.current_context() {
                 errors::RedisError::NotFound => {
-                    cache::inhabit_cache(&self, key, || async {
-                        self.find_config_by_key(key).await
-                    })
-                    .await?
+                    cache::inhabit_cache(self, key, || async { self.find_config_by_key(key).await })
+                        .await?
                 }
                 err => Err(report!(errors::StorageError::KVError)
                     .attach_printable(format!("Error while fetching config {err}")))?,
