@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use common_utils::{
     crypto, date_time,
     errors::{CustomResult, ValidationError},
+    id_type,
 };
 use diesel_models::{address::AddressUpdateInternal, encryption::Encryption, enums};
 use error_stack::ResultExt;
@@ -48,13 +49,13 @@ pub struct PaymentAddress {
     pub address: Address,
     pub payment_id: String,
     // This is present in `PaymentAddress` because even `payouts` uses `PaymentAddress`
-    pub customer_id: Option<String>,
+    pub customer_id: Option<id_type::CustomerId>,
 }
 
 #[derive(Debug, Clone)]
 pub struct CustomerAddress {
     pub address: Address,
-    pub customer_id: String,
+    pub customer_id: id_type::CustomerId,
 }
 
 #[async_trait]
@@ -80,7 +81,7 @@ impl behaviour::Conversion for CustomerAddress {
                 .customer_id
                 .clone()
                 .ok_or(ValidationError::MissingRequiredField {
-                    field_name: "cutomer_id".to_string(),
+                    field_name: "customer_id".to_string(),
                 })?;
 
         let address = Address::convert_back(other, key).await?;

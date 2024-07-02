@@ -1,7 +1,8 @@
+pub mod opensearch;
 #[cfg(feature = "olap")]
 pub mod user;
 pub mod user_role;
-
+pub use hyperswitch_interfaces::consts::{NO_ERROR_CODE, NO_ERROR_MESSAGE};
 // ID generation
 pub(crate) const ID_LENGTH: usize = 20;
 pub(crate) const MAX_ID_LENGTH: usize = 64;
@@ -31,8 +32,6 @@ pub const DEFAULT_SESSION_EXPIRY: i64 = 15 * 60;
 pub const FINGERPRINT_SECRET_LENGTH: usize = 64;
 
 // String literals
-pub(crate) const NO_ERROR_MESSAGE: &str = "No error message";
-pub(crate) const NO_ERROR_CODE: &str = "No error code";
 pub(crate) const UNSUPPORTED_ERROR_MESSAGE: &str = "Unsupported response type";
 pub(crate) const LOW_BALANCE_ERROR_MESSAGE: &str = "Insufficient balance in the payment method";
 pub(crate) const CONNECTOR_UNAUTHORIZED_ERROR: &str = "Authentication Error from the connector";
@@ -50,7 +49,6 @@ pub(crate) const BASE64_ENGINE_URL_SAFE: base64::engine::GeneralPurpose =
     base64::engine::general_purpose::URL_SAFE;
 
 pub(crate) const API_KEY_LENGTH: usize = 64;
-pub(crate) const PUB_SUB_CHANNEL: &str = "hyperswitch_invalidate";
 
 // Apple Pay validation url
 pub(crate) const APPLEPAY_VALIDATION_URL: &str =
@@ -118,4 +116,9 @@ pub const POLL_ID_TTL: i64 = 900;
 pub const DEFAULT_POLL_DELAY_IN_SECS: i8 = 2;
 pub const DEFAULT_POLL_FREQUENCY: i8 = 5;
 
+// Number of seconds to subtract from access token expiry
+pub(crate) const REDUCE_ACCESS_TOKEN_EXPIRY_TIME: u8 = 15;
 pub const CONNECTOR_CREDS_TOKEN_TTL: i64 = 900;
+
+//max_amount allowed is 999999999 in minor units
+pub const MAX_ALLOWED_AMOUNT: i64 = 999999999;

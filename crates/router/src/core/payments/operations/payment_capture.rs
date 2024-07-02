@@ -12,7 +12,8 @@ use crate::{
         errors::{self, RouterResult, StorageErrorExt},
         payments::{self, helpers, operations, types::MultipleCaptureData},
     },
-    routes::{app::ReqState, AppState},
+    events::audit_events::{AuditEvent, AuditEventType},
+    routes::{app::ReqState, SessionState},
     services,
     types::{
         self as core_types,
@@ -34,7 +35,7 @@ impl<F: Send + Clone> GetTracker<F, payments::PaymentData<F>, api::PaymentsCaptu
     #[instrument(skip_all)]
     async fn get_trackers<'a>(
         &'a self,
-        state: &'a AppState,
+        state: &'a SessionState,
         payment_id: &api::PaymentIdType,
         request: &api::PaymentsCaptureRequest,
         merchant_account: &domain::MerchantAccount,
@@ -52,7 +53,12 @@ impl<F: Send + Clone> GetTracker<F, payments::PaymentData<F>, api::PaymentsCaptu
             .change_context(errors::ApiErrorResponse::PaymentNotFound)?;
 
         payment_intent = db
-            .find_payment_intent_by_payment_id_merchant_id(&payment_id, merchant_id, storage_scheme)
+            .find_payment_intent_by_payment_id_merchant_id(
+                &payment_id,
+                merchant_id,
+                key_store,
+                storage_scheme,
+            )
             .await
             .to_not_found_response(errors::ApiErrorResponse::PaymentNotFound)?;
 
@@ -77,8 +83,10 @@ impl<F: Send + Clone> GetTracker<F, payments::PaymentData<F>, api::PaymentsCaptu
         helpers::validate_status_with_capture_method(payment_intent.status, capture_method)?;
 
         helpers::validate_amount_to_capture(
-            payment_attempt.amount_capturable,
-            request.amount_to_capture,
+            payment_attempt.amount_capturable.get_amount_as_i64(),
+            request
+                .amount_to_capture
+                .map(|capture_amount| capture_amount.get_amount_as_i64()),
         )?;
 
         helpers::validate_capture_method(capture_method)?;
@@ -89,8 +97,8 @@ impl<F: Send + Clone> GetTracker<F, payments::PaymentData<F>, api::PaymentsCaptu
                 .get_required_value("amount_to_capture")?;
 
             helpers::validate_amount_to_capture(
-                payment_attempt.amount_capturable,
-                Some(amount_to_capture),
+                payment_attempt.amount_capturable.get_amount_as_i64(),
+                Some(amount_to_capture.get_amount_as_i64()),
             )?;
 
             let previous_captures = db
@@ -228,7 +236,6 @@ impl<F: Send + Clone> GetTracker<F, payments::PaymentData<F>, api::PaymentsCaptu
             payment_link_data: None,
             incremental_authorization_details: None,
             authorizations: vec![],
-            frm_metadata: None,
             authentication: None,
             recurring_details: None,
             poll_config: None,
@@ -253,8 +260,8 @@ impl<F: Clone> UpdateTracker<F, payments::PaymentData<F>, api::PaymentsCaptureRe
     #[instrument(skip_all)]
     async fn update_trackers<'b>(
         &'b self,
-        db: &'b AppState,
-        _req_state: ReqState,
+        db: &'b SessionState,
+        req_state: ReqState,
         mut payment_data: payments::PaymentData<F>,
         _customer: Option<domain::Customer>,
         storage_scheme: enums::MerchantStorageScheme,
@@ -293,6 +300,16 @@ impl<F: Clone> UpdateTracker<F, payments::PaymentData<F>, api::PaymentsCaptureRe
         } else {
             payment_data.payment_attempt
         };
+        let capture_amount = payment_data.payment_attempt.amount_to_capture;
+        let multiple_capture_count = payment_data.payment_attempt.multiple_capture_count;
+        req_state
+            .event_context
+            .event(AuditEvent::new(AuditEventType::PaymentCapture {
+                capture_amount,
+                multiple_capture_count,
+            }))
+            .with(payment_data.to_event())
+            .emit();
         Ok((Box::new(self), payment_data))
     }
 }
